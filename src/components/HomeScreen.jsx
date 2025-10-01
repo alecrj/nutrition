@@ -4,6 +4,9 @@ import MealCard from './MealCard';
 import SwapModal from './SwapModal';
 import ChatCoach from './ChatCoach';
 import BottomNav from './BottomNav';
+import ProgressTracker from './ProgressTracker';
+import GroceryList from './GroceryList';
+import Settings from './Settings';
 import {
   loadUserProfile,
   loadMealPlan,
@@ -77,20 +80,20 @@ const HomeScreen = () => {
   const dailyTotals = calculateDailyTotals();
 
   // Render different screens based on navigation
-  if (currentScreen !== 'home') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="p-6 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {currentScreen === 'progress' && 'Progress Tracker'}
-            {currentScreen === 'groceries' && 'Grocery List'}
-            {currentScreen === 'settings' && 'Settings'}
-          </h2>
-          <p className="text-gray-600">Coming soon!</p>
-        </div>
-        <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} />
-      </div>
-    );
+  if (currentScreen === 'progress') {
+    return <ProgressTracker onNavigate={setCurrentScreen} />;
+  }
+
+  if (currentScreen === 'groceries') {
+    return <GroceryList mealPlan={mealPlan} onNavigate={setCurrentScreen} />;
+  }
+
+  if (currentScreen === 'settings') {
+    return <Settings userProfile={userProfile} onNavigate={setCurrentScreen} />;
+  }
+
+  if (currentScreen === 'chat') {
+    return <ChatCoach userProfile={userProfile} onClose={() => setCurrentScreen('home')} />;
   }
 
   return (
