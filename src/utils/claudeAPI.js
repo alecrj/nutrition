@@ -3,45 +3,62 @@
  * Handles all interactions with Anthropic's Claude API
  */
 
-const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
 const MAX_TOKENS = 4096;
 const API_TIMEOUT = 30000; // 30 seconds
 
-// Get API key from environment or prompt user
-const getApiKey = () => {
-  // In production, this should come from a secure backend
-  // For MVP, we'll use a key stored in localStorage or prompt
-  const key = localStorage.getItem('claude_api_key') || import.meta.env.VITE_CLAUDE_API_KEY;
-  if (!key) {
-    throw new Error('Claude API key not configured. Please add your API key in settings.');
+// Determine API endpoint (local dev vs production)
+const getApiEndpoint = () => {
+  // In development, use direct API calls with env variable
+  if (import.meta.env.DEV && import.meta.env.VITE_CLAUDE_API_KEY) {
+    return {
+      url: 'https://api.anthropic.com/v1/messages',
+      direct: true
+    };
   }
-  return key;
+  // In production, use serverless function
+  return {
+    url: '/api/claude',
+    direct: false
+  };
 };
 
 /**
  * Makes a request to Claude API with timeout handling
  */
 const callClaudeAPI = async (messages, systemPrompt) => {
-  const apiKey = getApiKey();
-
+  const endpoint = getApiEndpoint();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   try {
-    const response = await fetch(CLAUDE_API_URL, {
+    const requestBody = {
+      messages,
+      system: systemPrompt,
+      max_tokens: MAX_TOKENS
+    };
+
+    // Build headers based on endpoint type
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    // Add API key for direct calls (dev only)
+    if (endpoint.direct) {
+      const apiKey = import.meta.env.VITE_CLAUDE_API_KEY;
+      if (!apiKey) {
+        throw new Error('API key not configured');
+      }
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+
+      // For direct calls, include model in body
+      requestBody.model = 'claude-sonnet-4-20250514';
+    }
+
+    const response = await fetch(endpoint.url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: systemPrompt,
-        messages: messages
-      }),
+      headers,
+      body: JSON.stringify(requestBody),
       signal: controller.signal
     });
 
@@ -49,7 +66,7 @@ const callClaudeAPI = async (messages, systemPrompt) => {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `API error: ${response.status}`);
+      throw new Error(error.error?.message || error.message || `API error: ${response.status}`);
     }
 
     const data = await response.json();
